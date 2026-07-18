@@ -11,8 +11,8 @@ from app.models.schemas import (
     PredictionResult,
 )
 
-# Seed price table for paper trading (demo)
-DEMO_PRICES: dict[str, float] = {
+# Seed price table for paper trading (demo) — mutable for mark-to-market
+BASE_DEMO_PRICES: dict[str, float] = {
     "NVDA": 128.50,
     "MSFT": 425.20,
     "AMD": 162.80,
@@ -25,9 +25,21 @@ DEMO_PRICES: dict[str, float] = {
     "CRM": 312.50,
 }
 
+DEMO_PRICES: dict[str, float] = dict(BASE_DEMO_PRICES)
+
 
 def get_demo_price(symbol: str) -> float:
     return DEMO_PRICES.get(symbol.upper(), 100.0)
+
+
+def bump_demo_prices(multipliers: dict[str, float]) -> None:
+    """Reset to base prices, then apply mark-to-market multipliers for demo P&L."""
+    DEMO_PRICES.clear()
+    DEMO_PRICES.update(BASE_DEMO_PRICES)
+    for symbol, mult in multipliers.items():
+        key = symbol.upper()
+        if key in DEMO_PRICES:
+            DEMO_PRICES[key] = round(BASE_DEMO_PRICES[key] * mult, 2)
 
 
 class GeminiService:

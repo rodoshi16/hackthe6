@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database.connection import connect_db, close_db
-from app.routes import strategy, stock, trade, predict
+from app.routes import strategy, stock, trade, predict, demo
 
 
 @asynccontextmanager
@@ -36,6 +36,7 @@ app.include_router(strategy.router)
 app.include_router(stock.router)
 app.include_router(trade.router)
 app.include_router(predict.router)
+app.include_router(demo.router)
 
 
 @app.get("/")

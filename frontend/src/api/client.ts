@@ -144,4 +144,13 @@ export const api = {
       { method: 'POST', body: JSON.stringify(payload) },
       token,
     ),
+
+  seedDemo: (token?: string) =>
+    request<{
+      ok: boolean
+      message: string
+      strategy: Strategy
+      portfolio: Portfolio
+      trades: Trade[]
+    }>('/demo/seed', { method: 'POST', body: '{}' }, token),
 }

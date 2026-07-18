@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Area,
   AreaChart,
@@ -9,7 +9,7 @@ import {
   YAxis,
 } from 'recharts'
 import { Link } from 'react-router-dom'
-import { api, type Portfolio, type Trade } from '../api/client'
+import { api, type Portfolio, type Strategy, type Trade } from '../api/client'
 import { useAuthToken } from '../hooks/useAuthToken'
 
 export function DashboardPage() {
@@ -17,30 +17,36 @@ export function DashboardPage() {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
   const [history, setHistory] = useState<{ date: string; value: number }[]>([])
   const [trades, setTrades] = useState<Trade[]>([])
+  const [strategies, setStrategies] = useState<Strategy[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [seeding, setSeeding] = useState(false)
+
+  const load = useCallback(async () => {
+    const token = await getToken()
+    const [p, t, s] = await Promise.all([
+      api.getPortfolio(token),
+      api.getTrades(token),
+      api.listStrategies(token),
+    ])
+    setPortfolio(p.portfolio)
+    setHistory(
+      p.history.length
+        ? p.history
+        : [
+            { date: 'Start', value: p.portfolio.startingBalance },
+            { date: 'Now', value: p.portfolio.currentValue },
+          ],
+    )
+    setTrades(t.trades)
+    setStrategies(s.strategies)
+  }, [getToken])
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const token = await getToken()
-        const [p, t] = await Promise.all([
-          api.getPortfolio(token),
-          api.getTrades(token),
-        ])
-        if (!cancelled) {
-          setPortfolio(p.portfolio)
-          setHistory(
-            p.history.length
-              ? p.history
-              : [
-                  { date: 'Start', value: p.portfolio.startingBalance },
-                  { date: 'Now', value: p.portfolio.currentValue },
-                ],
-          )
-          setTrades(t.trades)
-        }
+        await load()
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load')
       } finally {
@@ -50,16 +56,30 @@ export function DashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [getToken])
+  }, [load])
+
+  const seedDemo = async () => {
+    setSeeding(true)
+    setError('')
+    try {
+      const token = await getToken()
+      await api.seedDemo(token)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Seed failed')
+    } finally {
+      setSeeding(false)
+    }
+  }
 
   if (loading) {
     return <p className="text-muted animate-rise">Loading portfolio…</p>
   }
 
-  if (error || !portfolio) {
+  if (error && !portfolio) {
     return (
       <div className="animate-rise">
-        <p className="text-danger">{error || 'No portfolio'}</p>
+        <p className="text-danger">{error}</p>
         <p className="mt-2 text-sm text-muted">
           Start the backend on port 8000, then refresh.
         </p>
@@ -67,16 +87,42 @@ export function DashboardPage() {
     )
   }
 
+  if (!portfolio) return null
+
   const positive = portfolio.returnPct >= 0
+  const emptyDesk = portfolio.holdings.length === 0 && trades.length === 0
 
   return (
     <div className="space-y-10">
-      <header className="animate-rise">
-        <h1 className="font-display text-3xl font-bold text-ink sm:text-4xl">
-          Portfolio
-        </h1>
-        <p className="mt-1 text-muted">Paper desk performance — simulated capital only.</p>
+      <header className="animate-rise flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl font-bold text-ink sm:text-4xl">
+            Portfolio
+          </h1>
+          <p className="mt-1 text-muted">Paper desk performance — simulated capital only.</p>
+        </div>
+        <button
+          type="button"
+          onClick={seedDemo}
+          disabled={seeding}
+          className="border border-ink/20 px-4 py-2 text-sm font-medium text-ink hover:border-signal hover:text-signal disabled:opacity-50 transition-colors"
+        >
+          {seeding ? 'Loading…' : emptyDesk ? 'Load demo desk' : 'Reset demo desk'}
+        </button>
       </header>
+
+      {error && <p className="text-sm text-danger">{error}</p>}
+
+      {emptyDesk && (
+        <p className="animate-rise text-sm text-muted">
+          Fresh desk with $10,000 cash. Click <strong>Load demo desk</strong> for a
+          pre-filled walkthrough, or{' '}
+          <Link to="/strategy" className="text-signal hover:underline">
+            create a strategy
+          </Link>
+          .
+        </p>
+      )}
 
       <div className="animate-rise-delay-1 grid gap-6 sm:grid-cols-3">
         <Metric label="Starting balance" value={`$${portfolio.startingBalance.toLocaleString()}`} />
@@ -130,6 +176,27 @@ export function DashboardPage() {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {strategies.length > 0 && (
+        <section className="animate-rise-delay-2">
+          <h2 className="mb-4 font-display text-xl font-bold">Strategies</h2>
+          <ul className="space-y-3">
+            {strategies.slice(0, 3).map((s) => (
+              <li key={s.id || s.name} className="flex flex-wrap items-baseline justify-between gap-2 border-l-2 border-signal pl-3">
+                <div>
+                  <p className="font-semibold">{s.name}</p>
+                  <p className="text-sm text-muted">
+                    {s.riskLevel} · {s.stocks.join(', ')}
+                  </p>
+                </div>
+                {s.verified && (
+                  <span className="text-xs font-medium text-signal">Verified · Solana</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="animate-rise-delay-3 grid gap-10 lg:grid-cols-2">
         <section>
