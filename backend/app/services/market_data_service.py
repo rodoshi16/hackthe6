@@ -345,13 +345,13 @@ async def get_quote(symbol: str, *, use_cache: bool = True) -> MarketQuote:
     return quote
 
 
-async def get_price(symbol: str) -> float:
-    quote = await get_quote(symbol)
+async def get_price(symbol: str, *, use_cache: bool = True) -> float:
+    quote = await get_quote(symbol, use_cache=use_cache)
     return quote.price
 
 
-async def get_prices(symbols: list[str]) -> dict[str, float]:
+async def get_prices(symbols: list[str], *, use_cache: bool = True) -> dict[str, float]:
     out: dict[str, float] = {}
     for sym in symbols:
-        out[sym.upper()] = await get_price(sym)
+        out[sym.upper()] = await get_price(sym, use_cache=use_cache)
     return out

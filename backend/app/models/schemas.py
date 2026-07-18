@@ -110,6 +110,11 @@ class Holding(BaseModel):
     shares: float
     avg_cost: float = Field(alias="avgCost")
     current_price: float = Field(alias="currentPrice")
+    market_value: float = Field(default=0.0, alias="marketValue")
+    cost_basis: float = Field(default=0.0, alias="costBasis")
+    unrealized_pnl: float = Field(default=0.0, alias="unrealizedPnl")
+    unrealized_pnl_pct: float = Field(default=0.0, alias="unrealizedPnlPct")
+    last_purchase_price: float | None = Field(default=None, alias="lastPurchasePrice")
 
     class Config:
         populate_by_name = True
@@ -122,6 +127,12 @@ class Portfolio(BaseModel):
     starting_balance: float = Field(default=10000.0, alias="startingBalance")
     current_value: float = Field(default=10000.0, alias="currentValue")
     return_pct: float = Field(default=0.0, alias="returnPct")
+    invested_value: float = Field(default=0.0, alias="investedValue")
+    total_cost_basis: float = Field(default=0.0, alias="totalCostBasis")
+    unrealized_pnl: float = Field(default=0.0, alias="unrealizedPnl")
+    unrealized_pnl_pct: float = Field(default=0.0, alias="unrealizedPnlPct")
+    last_marked_at: str | None = Field(default=None, alias="lastMarkedAt")
+    simulated: bool = True
 
     class Config:
         populate_by_name = True

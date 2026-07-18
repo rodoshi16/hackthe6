@@ -45,6 +45,11 @@ export type Holding = {
   shares: number
   avgCost: number
   currentPrice: number
+  marketValue?: number
+  costBasis?: number
+  unrealizedPnl?: number
+  unrealizedPnlPct?: number
+  lastPurchasePrice?: number | null
 }
 
 export type Portfolio = {
@@ -54,6 +59,12 @@ export type Portfolio = {
   startingBalance: number
   currentValue: number
   returnPct: number
+  investedValue?: number
+  totalCostBasis?: number
+  unrealizedPnl?: number
+  unrealizedPnlPct?: number
+  lastMarkedAt?: string | null
+  simulated?: boolean
 }
 
 export type Trade = {

@@ -124,7 +124,7 @@ export function DashboardPage() {
         </p>
       )}
 
-      <div className="animate-rise-delay-1 grid gap-6 sm:grid-cols-3">
+      <div className="animate-rise-delay-1 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <Metric label="Starting balance" value={`$${portfolio.startingBalance.toLocaleString()}`} />
         <Metric label="Current value" value={`$${portfolio.currentValue.toLocaleString()}`} />
         <Metric
@@ -132,7 +132,20 @@ export function DashboardPage() {
           value={`${positive ? '+' : ''}${portfolio.returnPct.toFixed(2)}%`}
           accent={positive ? 'signal' : 'danger'}
         />
+        <Metric
+          label="Unrealized P&L"
+          value={`${(portfolio.unrealizedPnl ?? 0) >= 0 ? '+' : ''}$${(portfolio.unrealizedPnl ?? 0).toFixed(2)}`}
+          accent={(portfolio.unrealizedPnl ?? 0) >= 0 ? 'signal' : 'danger'}
+        />
       </div>
+
+      <p className="animate-rise-delay-1 text-xs text-muted">
+        Paper desk · marked to live market
+        {portfolio.lastMarkedAt
+          ? ` · ${new Date(portfolio.lastMarkedAt).toLocaleString()}`
+          : ''}
+        {portfolio.simulated !== false ? ' · simulated capital only' : ''}
+      </p>
 
       <div className="animate-rise-delay-2">
         <h2 className="font-display text-xl font-bold">Growth</h2>
@@ -214,20 +227,33 @@ export function DashboardPage() {
           ) : (
             <ul className="divide-y divide-ink/10">
               {portfolio.holdings.map((h) => {
-                const value = h.shares * h.currentPrice
-                const cost = h.shares * h.avgCost
-                const pnl = value - cost
+                const pnl = h.unrealizedPnl ?? h.shares * h.currentPrice - h.shares * h.avgCost
+                const pnlPct =
+                  h.unrealizedPnlPct ??
+                  (h.avgCost ? ((h.currentPrice - h.avgCost) / h.avgCost) * 100 : 0)
                 return (
-                  <li key={h.stock} className="flex items-center justify-between py-3">
+                  <li key={h.stock} className="flex items-center justify-between gap-4 py-3">
                     <div>
                       <p className="font-semibold tracking-wide">{h.stock}</p>
                       <p className="text-sm text-muted">
-                        {h.shares.toFixed(4)} shares @ ${h.currentPrice.toFixed(2)}
+                        {h.shares.toFixed(4)} shares · avg ${h.avgCost.toFixed(2)} · mark $
+                        {h.currentPrice.toFixed(2)}
+                      </p>
+                      <p className="text-xs text-muted">
+                        Value ${(h.marketValue ?? h.shares * h.currentPrice).toFixed(2)}
+                        {h.lastPurchasePrice != null &&
+                          ` · last buy $${h.lastPurchasePrice.toFixed(2)}`}
                       </p>
                     </div>
-                    <p className={pnl >= 0 ? 'text-signal font-medium' : 'text-danger font-medium'}>
-                      {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
-                    </p>
+                    <div className="text-right">
+                      <p className={pnl >= 0 ? 'text-signal font-medium' : 'text-danger font-medium'}>
+                        {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+                      </p>
+                      <p className={`text-xs ${pnlPct >= 0 ? 'text-signal' : 'text-danger'}`}>
+                        {pnlPct >= 0 ? '+' : ''}
+                        {pnlPct.toFixed(2)}%
+                      </p>
+                    </div>
                   </li>
                 )
               })}
@@ -250,7 +276,8 @@ export function DashboardPage() {
                     {t.stock} · ${t.amount.toFixed(2)}
                   </p>
                   <p className="mt-0.5 text-xs text-muted line-clamp-2">
-                    {t.reasoning || 'Paper trade'}
+                    {t.shares.toFixed(4)} @ ${t.price.toFixed(2)}
+                    {t.reasoning ? ` · ${t.reasoning}` : ' · Paper trade'}
                     {t.confidence ? ` · AI confidence ${t.confidence}%` : ''}
                   </p>
                 </li>

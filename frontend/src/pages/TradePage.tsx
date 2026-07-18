@@ -184,8 +184,21 @@ export function TradePage() {
           </p>
           <p className="text-sm text-muted">
             ${lastTrade.amount.toFixed(2)} · {lastTrade.shares.toFixed(4)} shares @ $
-            {lastTrade.price.toFixed(2)}
+            {lastTrade.price.toFixed(2)} (simulated fill)
           </p>
+          {portfolio && (
+            <p className="text-sm text-muted">
+              Unrealized P&L{' '}
+              <span
+                className={
+                  (portfolio.unrealizedPnl ?? 0) >= 0 ? 'text-signal font-medium' : 'text-danger font-medium'
+                }
+              >
+                {(portfolio.unrealizedPnl ?? 0) >= 0 ? '+' : ''}$
+                {(portfolio.unrealizedPnl ?? 0).toFixed(2)}
+              </span>
+            </p>
+          )}
           {confidence > 0 && (
             <p className="text-sm">
               Confidence: <strong>{confidence}%</strong>
