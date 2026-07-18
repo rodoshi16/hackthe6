@@ -190,7 +190,10 @@ export function AnalyzePage() {
           )}
 
           <div>
-            <p className="text-sm text-muted">Confidence</p>
+            <p className="text-sm text-muted">
+              Confidence in reasoning
+              <span className="ml-1 font-normal">(not odds the price rises)</span>
+            </p>
             <div className="mt-2 flex items-center gap-3">
               <div className="h-1.5 flex-1 bg-ink/10">
                 <div
@@ -203,6 +206,19 @@ export function AnalyzePage() {
           </div>
 
           <p className="text-sm leading-relaxed text-ink/80">{analysis.summary}</p>
+
+          {analysis.reasoning && analysis.reasoning.length > 0 && (
+            <div>
+              <h3 className="text-sm font-bold text-ink">Reasoning</h3>
+              <ol className="mt-2 list-decimal space-y-2 pl-5">
+                {analysis.reasoning.map((r) => (
+                  <li key={r} className="text-sm text-ink/80">
+                    {r}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
 
           <div className="grid gap-6 sm:grid-cols-2">
             <div>
@@ -235,7 +251,8 @@ export function AnalyzePage() {
               confidence: analysis.confidence,
               reasoning: [
                 analysis.summary,
-                ...analysis.positives.slice(0, 2),
+                ...(analysis.reasoning ?? []).slice(0, 2),
+                ...analysis.positives.slice(0, 1),
                 `Risks: ${analysis.risks.slice(0, 2).join('; ')}`,
               ].join(' '),
               price: market?.price,

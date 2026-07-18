@@ -24,7 +24,7 @@ async def analyze_stock(
     return {
         "analysis": analysis,
         "market": market,
-        "disclaimer": "AI-assisted analysis. Potential opportunity and risk assessment only — never a certainty.",
+        "disclaimer": "AI-assisted analysis. Potential opportunity and risk assessment only — never a certainty. Confidence measures reasoning quality given available data, not upside probability.",
     }
 
 

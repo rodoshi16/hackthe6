@@ -63,10 +63,15 @@ class StockAnalysis(BaseModel):
     symbol: str
     recommendation: Literal["BUY", "HOLD", "SELL"]
     confidence: int
+    reasoning: list[str] = []
     positives: list[str] = []
     risks: list[str] = []
     summary: str
-    disclaimer: str = "AI-assisted analysis. This is a potential opportunity assessment, not financial advice."
+    disclaimer: str = (
+        "AI-assisted analysis grounded in available market data. "
+        "Confidence reflects strength of the reasoning given the information — "
+        "not the probability the stock will rise. Not financial advice."
+    )
 
 
 class TradeCreate(BaseModel):

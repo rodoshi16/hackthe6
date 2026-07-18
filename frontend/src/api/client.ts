@@ -20,6 +20,7 @@ export type StockAnalysis = {
   symbol: string
   recommendation: 'BUY' | 'HOLD' | 'SELL'
   confidence: number
+  reasoning?: string[]
   positives: string[]
   risks: string[]
   summary: string
