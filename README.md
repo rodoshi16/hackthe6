@@ -6,10 +6,9 @@ AlphaAI is a simulated AI hedge fund desk: generate strategies, analyze stocks w
 
 > Not financial advice. No real money. AI never claims certainty.
 
-
-<div style="display: flex; gap: 16px;">
-  <img src="https://github.com/user-attachments/assets/5ee21049-c270-4b9c-8d00-15229479f2fb" width="48%" alt="Image 1" />
-  <img src="https://github.com/user-attachments/assets/ea66a07f-6a55-42bf-b6dc-6b749fd1f1b2" width="48%" alt="Image 2" />
+<div style="display: flex; gap: 16px; align-items: flex-start;">
+  <img src="https://github.com/user-attachments/assets/5ee21049-c270-4b9c-8d00-15229479f2fb" height="250" alt="Image 1" />
+  <img src="https://github.com/user-attachments/assets/ea66a07f-6a55-42bf-b6dc-6b749fd1f1b2" height="250" alt="Image 2" />
 </div>
 
 
