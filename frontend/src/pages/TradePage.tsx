@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, Link } from 'react-router-dom'
-import { api, type Portfolio, type Trade } from '../api/client'
+import { api, type MarketQuote, type Portfolio, type Trade } from '../api/client'
 import { useAuthToken } from '../hooks/useAuthToken'
 
 type TradeState = {
@@ -8,6 +8,7 @@ type TradeState = {
   type?: 'BUY' | 'SELL'
   confidence?: number
   reasoning?: string
+  price?: number
 }
 
 export function TradePage() {
@@ -27,6 +28,24 @@ export function TradePage() {
   const [lastTrade, setLastTrade] = useState<Trade | null>(null)
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
   const [explanation, setExplanation] = useState<Record<string, unknown> | null>(null)
+  const [quote, setQuote] = useState<MarketQuote | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      if (!stock.trim()) return
+      try {
+        const token = await getToken()
+        const res = await api.getQuote(stock.trim(), token)
+        if (!cancelled) setQuote(res.quote)
+      } catch {
+        if (!cancelled) setQuote(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [stock, getToken])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -59,7 +78,7 @@ export function TradePage() {
       <header className="animate-rise">
         <h1 className="font-display text-3xl font-bold sm:text-4xl">Paper trade</h1>
         <p className="mt-1 text-muted">
-          Simulate buys and sells with fake money. Every order stores an AI explanation.
+          Simulate buys and sells with fake money at live (or fallback) market prices.
         </p>
       </header>
 
@@ -85,6 +104,23 @@ export function TradePage() {
             />
           </label>
         </div>
+
+        {quote && (
+          <p className="text-sm text-muted">
+            Mark for paper fill:{' '}
+            <span className="font-semibold text-ink tabular-nums">
+              ${quote.price.toFixed(2)}
+            </span>
+            {quote.companyName && <> · {quote.companyName}</>}
+            <span className="text-xs"> · {quote.source}</span>
+            {amount > 0 && quote.price > 0 && (
+              <>
+                {' '}
+                · ~{(amount / quote.price).toFixed(4)} shares
+              </>
+            )}
+          </p>
+        )}
 
         <div className="flex gap-2">
           {(['BUY', 'SELL'] as const).map((t) => (

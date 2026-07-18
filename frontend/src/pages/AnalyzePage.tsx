@@ -1,7 +1,22 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, type StockAnalysis } from '../api/client'
+import {
+  Area,
+  AreaChart,
+  ResponsiveContainer,
+  Tooltip,
+  YAxis,
+} from 'recharts'
+import { api, type MarketQuote, type StockAnalysis } from '../api/client'
 import { useAuthToken } from '../hooks/useAuthToken'
+
+function formatCap(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(n)) return '—'
+  if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`
+  return `$${n.toLocaleString()}`
+}
 
 export function AnalyzePage() {
   const { getToken } = useAuthToken()
@@ -9,6 +24,7 @@ export function AnalyzePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [analysis, setAnalysis] = useState<StockAnalysis | null>(null)
+  const [market, setMarket] = useState<MarketQuote | null>(null)
 
   const analyze = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -18,6 +34,7 @@ export function AnalyzePage() {
       const token = await getToken()
       const res = await api.analyzeStock(symbol.trim(), token)
       setAnalysis(res.analysis)
+      setMarket(res.market ?? null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed')
     } finally {
@@ -32,12 +49,14 @@ export function AnalyzePage() {
         ? 'text-danger'
         : 'text-warn'
 
+  const changePositive = (market?.changePercent ?? 0) >= 0
+
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <header className="animate-rise">
         <h1 className="font-display text-3xl font-bold sm:text-4xl">Stock analysis</h1>
         <p className="mt-1 text-muted">
-          AI-assisted research with explicit risk assessment — never a certainty claim.
+          Live market context plus AI-assisted research — never a certainty claim.
         </p>
       </header>
 
@@ -81,6 +100,9 @@ export function AnalyzePage() {
                 {analysis.stock}{' '}
                 <span className="text-lg text-muted">({analysis.symbol})</span>
               </h2>
+              {market?.sector && (
+                <p className="mt-1 text-sm text-muted">{market.sector}</p>
+              )}
             </div>
             <div className="text-right">
               <p className="text-sm text-muted">Recommendation</p>
@@ -89,6 +111,83 @@ export function AnalyzePage() {
               </p>
             </div>
           </div>
+
+          {market && (
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-4">
+                <div>
+                  <p className="text-sm text-muted">Price</p>
+                  <p className="font-display text-xl font-bold tabular-nums">
+                    ${market.price.toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted">Daily change</p>
+                  <p
+                    className={`font-semibold tabular-nums ${
+                      changePositive ? 'text-signal' : 'text-danger'
+                    }`}
+                  >
+                    {market.change != null
+                      ? `${changePositive ? '+' : ''}${market.change.toFixed(2)}`
+                      : '—'}{' '}
+                    {market.changePercent != null && (
+                      <span className="text-sm">
+                        ({changePositive ? '+' : ''}
+                        {market.changePercent.toFixed(2)}%)
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted">Market cap</p>
+                  <p className="font-semibold tabular-nums">{formatCap(market.marketCap)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted">Data source</p>
+                  <p className="text-sm font-medium capitalize">{market.source}</p>
+                </div>
+              </div>
+
+              {market.history.length > 1 && (
+                <div>
+                  <p className="mb-2 text-sm text-muted">Recent prices</p>
+                  <div className="h-28 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={market.history}>
+                        <defs>
+                          <linearGradient id="pxFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#1fa67a" stopOpacity={0.3} />
+                            <stop offset="100%" stopColor="#1fa67a" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <YAxis domain={['auto', 'auto']} hide />
+                        <Tooltip
+                          contentStyle={{
+                            background: '#0b1f1a',
+                            border: 'none',
+                            color: '#f4f8f6',
+                            fontSize: 12,
+                          }}
+                          labelFormatter={(_, payload) =>
+                            String(payload?.[0]?.payload?.date ?? '')
+                          }
+                          formatter={(value) => [`$${Number(value).toFixed(2)}`, 'Close']}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="close"
+                          stroke="#1fa67a"
+                          strokeWidth={1.5}
+                          fill="url(#pxFill)"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <p className="text-sm text-muted">Confidence</p>
@@ -139,6 +238,7 @@ export function AnalyzePage() {
                 ...analysis.positives.slice(0, 2),
                 `Risks: ${analysis.risks.slice(0, 2).join('; ')}`,
               ].join(' '),
+              price: market?.price,
             }}
             className="inline-block bg-signal px-5 py-2.5 text-sm font-semibold text-ink hover:bg-signal-bright transition-colors"
           >

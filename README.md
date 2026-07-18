@@ -15,6 +15,7 @@ AlphaAI is a simulated AI hedge fund desk: generate strategies, analyze stocks w
 | Database | MongoDB Atlas (in-memory fallback for demo) |
 | Auth | Auth0 (optional — demo mode works without it) |
 | AI | Gemini API (rich mock responses when key missing) |
+| Market data | Finnhub (optional key) → Yahoo Finance → demo fallback |
 | Blockchain | Solana strategy hash verification |
 
 ## Quick start
@@ -59,6 +60,7 @@ Without Auth0 / Gemini / MongoDB configured, the app runs in **demo mode** with 
 POST /strategy/create
 GET  /strategy/list
 POST /stock/analyze
+GET  /stock/quote/{symbol}
 POST /trade
 GET  /portfolio
 GET  /trades
@@ -66,6 +68,15 @@ POST /predict/analyze
 GET  /predict/markets
 ```
 
+## Market data
+
+Paper fills and research quotes use live prices when available:
+
+1. **Finnhub** — if `FINNHUB_API_KEY` is set (free at [finnhub.io](https://finnhub.io))
+2. **Yahoo Finance** — no key required
+3. **Demo marks** — offline fallback so the app never breaks
+
+`POST /stock/analyze` still returns the same `analysis` object; it also adds an optional `market` payload (price, company name, market cap, sector, daily change, history, source).
 ## Environment
 
 See `.env.example` and `frontend/.env.example`.
@@ -74,6 +85,7 @@ See `.env.example` and `frontend/.env.example`.
 |----------|---------|
 | `MONGODB_URI` | MongoDB Atlas connection string |
 | `GEMINI_API_KEY` | Google Gemini for live AI |
+| `FINNHUB_API_KEY` | Optional Finnhub key for quotes/profile (Yahoo used if empty) |
 | `AUTH0_DOMAIN` / `AUTH0_AUDIENCE` | Backend JWT validation |
 | `VITE_AUTH0_*` | Frontend Auth0 login |
 | `VITE_API_URL` | Backend base URL |

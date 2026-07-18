@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     starting_cash: float = 10000.0
     solana_rpc_url: str = "https://api.devnet.solana.com"
+    finnhub_api_key: str = ""  # free key from https://finnhub.io — optional; Yahoo used if empty
     demo_mode: bool = True  # use mock AI/DB when keys missing
 
 

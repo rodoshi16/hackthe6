@@ -6,40 +6,9 @@ from typing import Any
 
 from app.config import get_settings
 from app.models.schemas import (
-    StrategyRules,
     StockAnalysis,
     PredictionResult,
 )
-
-# Seed price table for paper trading (demo) — mutable for mark-to-market
-BASE_DEMO_PRICES: dict[str, float] = {
-    "NVDA": 128.50,
-    "MSFT": 425.20,
-    "AMD": 162.80,
-    "GOOG": 178.40,
-    "AAPL": 228.10,
-    "TSLA": 248.60,
-    "META": 585.30,
-    "AMZN": 198.70,
-    "PLTR": 72.40,
-    "CRM": 312.50,
-}
-
-DEMO_PRICES: dict[str, float] = dict(BASE_DEMO_PRICES)
-
-
-def get_demo_price(symbol: str) -> float:
-    return DEMO_PRICES.get(symbol.upper(), 100.0)
-
-
-def bump_demo_prices(multipliers: dict[str, float]) -> None:
-    """Reset to base prices, then apply mark-to-market multipliers for demo P&L."""
-    DEMO_PRICES.clear()
-    DEMO_PRICES.update(BASE_DEMO_PRICES)
-    for symbol, mult in multipliers.items():
-        key = symbol.upper()
-        if key in DEMO_PRICES:
-            DEMO_PRICES[key] = round(BASE_DEMO_PRICES[key] * mult, 2)
 
 
 class GeminiService:
@@ -109,14 +78,35 @@ Use real stock tickers. Never claim certainty. Frame as AI-assisted analysis."""
             print(f"Gemini strategy error: {e}")
             return self._mock_strategy(description)
 
-    async def analyze_stock(self, symbol: str) -> StockAnalysis:
+    async def analyze_stock(
+        self, symbol: str, market_context: dict[str, Any] | None = None
+    ) -> StockAnalysis:
         symbol = symbol.upper().strip()
+        company = (market_context or {}).get("companyName") or symbol
+        price = (market_context or {}).get("price")
+        sector = (market_context or {}).get("sector")
+        change_pct = (market_context or {}).get("changePercent")
+
         if not self.available:
-            return self._mock_analysis(symbol)
+            analysis = self._mock_analysis(symbol)
+            if market_context and market_context.get("companyName"):
+                analysis.stock = str(market_context["companyName"])
+            return analysis
+
+        market_block = ""
+        if market_context:
+            market_block = f"""
+Live market context (for grounding — do not invent prices):
+- Company: {company}
+- Last price: {price}
+- Sector: {sector}
+- Daily change %: {change_pct}
+- Market cap: {(market_context or {}).get("marketCap")}
+"""
 
         prompt = f"""You are AlphaAI, an AI-assisted stock research tool for educational paper trading.
-Analyze {symbol}. Never claim certainty. Use wording like "potential opportunity" and "risk assessment".
-
+Analyze {symbol} ({company}). Never claim certainty. Use wording like "potential opportunity" and "risk assessment".
+{market_block}
 Respond ONLY with valid JSON:
 {{
   "stock": "Company Name",
@@ -131,7 +121,7 @@ Respond ONLY with valid JSON:
             text = await self._generate(prompt)
             data = self._extract_json(text)
             return StockAnalysis(
-                stock=data.get("stock", symbol),
+                stock=data.get("stock", company),
                 symbol=symbol,
                 recommendation=data.get("recommendation", "HOLD"),
                 confidence=int(data.get("confidence", 50)),
@@ -141,7 +131,9 @@ Respond ONLY with valid JSON:
             )
         except Exception as e:
             print(f"Gemini analysis error: {e}")
-            return self._mock_analysis(symbol)
+            analysis = self._mock_analysis(symbol)
+            analysis.stock = company
+            return analysis
 
     async def predict_market(
         self, market: str, question: str, context: str = ""

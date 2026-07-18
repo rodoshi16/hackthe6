@@ -1,4 +1,7 @@
-"""Portfolio and trade persistence — MongoDB with in-memory fallback."""
+"""Portfolio and trade persistence — MongoDB with in-memory fallback.
+
+Fill prices come from live market data (paper trading only — no real brokerage).
+"""
 
 from __future__ import annotations
 
@@ -8,8 +11,8 @@ from typing import Any
 
 from app.config import get_settings
 from app.database.connection import get_db, get_memory_store, using_memory
-from app.models.schemas import Holding, Portfolio, Trade
-from app.services.gemini_service import get_demo_price
+from app.models.schemas import Holding, Portfolio
+from app.services.market_data_service import get_price, get_prices
 
 
 def _now() -> datetime:
@@ -104,7 +107,7 @@ async def execute_trade(
     price: float | None = None,
 ) -> dict[str, Any]:
     stock = stock.upper()
-    px = price or get_demo_price(stock)
+    px = price if price is not None else await get_price(stock)
     if px <= 0:
         raise ValueError("Invalid price")
     if amount <= 0:
@@ -164,13 +167,12 @@ async def execute_trade(
         "timestamp": _now().isoformat() if using_memory() else _now(),
     }
 
-    history = list(portfolio.get("history", []))
-    current_value = cash + sum(
-        h["shares"] * get_demo_price(h["stock"]) for h in holdings
-    )
-    # refresh prices
+    marks = await get_prices([h["stock"] for h in holdings])
     for h in holdings:
-        h["currentPrice"] = get_demo_price(h["stock"])
+        h["currentPrice"] = marks.get(h["stock"], h.get("currentPrice", px))
+
+    history = list(portfolio.get("history", []))
+    current_value = cash + sum(h["shares"] * h["currentPrice"] for h in holdings)
 
     today = _now().date().isoformat()
     if history and history[-1].get("date") == today:
@@ -211,10 +213,13 @@ async def get_portfolio(user_id: str) -> Portfolio:
     raw = await get_raw_portfolio(user_id)
     assert raw is not None
 
+    symbols = [h["stock"] for h in raw.get("holdings", [])]
+    marks = await get_prices(symbols) if symbols else {}
+
     holdings = []
     holdings_value = 0.0
     for h in raw.get("holdings", []):
-        price = get_demo_price(h["stock"])
+        price = marks.get(h["stock"]) or float(h.get("currentPrice") or 0) or await get_price(h["stock"])
         holdings.append(
             Holding(
                 stock=h["stock"],

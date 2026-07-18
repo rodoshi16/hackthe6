@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 
 from app.auth import get_current_user, user_id_from
 from app.database.connection import get_memory_store, using_memory, get_db
-from app.services.gemini_service import get_demo_price, bump_demo_prices
+from app.services.market_data_service import get_quote, bump_demo_prices
 from app.services.solana_service import verify_on_solana
 from app.services import portfolio_service as ps
 
@@ -20,11 +20,12 @@ async def seed_demo_desk(user: dict = Depends(get_current_user)):
     """
     Reset the current user to a rich demo state:
     strategy + Solana hash, holdings with unrealized P&L, trade history, growth chart.
+    Uses live prices when available; demo marks otherwise.
     """
     uid = user_id_from(user)
     await ps.ensure_user(uid, user.get("name", "Demo Trader"))
 
-    # Mark prices up so holdings show green P&L
+    # Keep offline demo bumps available if market APIs fail mid-seed
     bump_demo_prices(
         {
             "NVDA": 1.085,
@@ -33,6 +34,14 @@ async def seed_demo_desk(user: dict = Depends(get_current_user)):
             "GOOG": 1.041,
         }
     )
+
+    nvda_q = await get_quote("NVDA")
+    msft_q = await get_quote("MSFT")
+    nvda_px = nvda_q.price
+    msft_px = msft_q.price
+    # Cost basis ~8% below mark so the desk shows green P&L for walkthroughs
+    nvda_cost = round(nvda_px * 0.92, 2)
+    msft_cost = round(msft_px * 0.96, 2)
 
     now = datetime.now(timezone.utc)
     strategy_doc = {
@@ -66,32 +75,28 @@ async def seed_demo_desk(user: dict = Depends(get_current_user)):
     )
     strategy = await ps.save_strategy(strategy_doc)
 
-    # Build portfolio with cost basis below current mark
-    nvda_cost = 118.40
-    msft_cost = 412.00
     holdings = [
         {
             "stock": "NVDA",
             "shares": 12.0,
             "avgCost": nvda_cost,
-            "currentPrice": get_demo_price("NVDA"),
+            "currentPrice": nvda_px,
         },
         {
             "stock": "MSFT",
             "shares": 4.0,
             "avgCost": msft_cost,
-            "currentPrice": get_demo_price("MSFT"),
+            "currentPrice": msft_px,
         },
     ]
     cash = 4200.0
-    holdings_value = sum(h["shares"] * get_demo_price(h["stock"]) for h in holdings)
+    holdings_value = sum(h["shares"] * h["currentPrice"] for h in holdings)
     current = cash + holdings_value
     starting = 10000.0
 
     history = []
     for i in range(7):
         day = (now - timedelta(days=6 - i)).date().isoformat()
-        # Smooth climb from starting → current
         t = i / 6
         value = round(starting + (current - starting) * (t**1.15), 2)
         history.append({"date": day, "value": value})
@@ -149,7 +154,6 @@ async def seed_demo_desk(user: dict = Depends(get_current_user)):
     if using_memory():
         store = get_memory_store()
         store["portfolios"][uid] = portfolio
-        # Replace this user's trades
         store["trades"] = [t for t in store["trades"] if t.get("userId") != uid] + trades
     else:
         db = get_db()
@@ -167,4 +171,5 @@ async def seed_demo_desk(user: dict = Depends(get_current_user)):
         "verification": verification,
         "portfolio": portfolio_view,
         "trades": trades,
+        "marketSource": {"NVDA": nvda_q.source, "MSFT": msft_q.source},
     }

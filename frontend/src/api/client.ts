@@ -26,6 +26,19 @@ export type StockAnalysis = {
   disclaimer: string
 }
 
+export type MarketQuote = {
+  symbol: string
+  price: number
+  companyName: string
+  marketCap: number | null
+  sector: string | null
+  change: number | null
+  changePercent: number | null
+  history: { date: string; close: number }[]
+  source: string
+  asOf: string
+}
+
 export type Holding = {
   stock: string
   shares: number
@@ -97,11 +110,14 @@ export const api = {
     request<{ strategies: Strategy[] }>('/strategy/list', {}, token),
 
   analyzeStock: (symbol: string, token?: string) =>
-    request<{ analysis: StockAnalysis; disclaimer: string }>(
+    request<{ analysis: StockAnalysis; market?: MarketQuote; disclaimer: string }>(
       '/stock/analyze',
       { method: 'POST', body: JSON.stringify({ symbol }) },
       token,
     ),
+
+  getQuote: (symbol: string, token?: string) =>
+    request<{ quote: MarketQuote }>(`/stock/quote/${encodeURIComponent(symbol)}`, {}, token),
 
   trade: (
     payload: {
