@@ -127,6 +127,291 @@ def _as_str_list(value: Any) -> list[str]:
     return []
 
 
+def _normalize_tickers(raw: Any, fallback: list[str]) -> list[str]:
+    if not isinstance(raw, list) or not raw:
+        return fallback
+    out: list[str] = []
+    for item in raw:
+        ticker = str(item).strip().upper().replace(".", "-")
+        if ticker and ticker not in out and 1 <= len(ticker) <= 6:
+            out.append(ticker)
+    return out[:8] if out else fallback
+
+
+# Theme playbooks for offline / no-Gemini strategy generation
+STRATEGY_THEMES: list[dict[str, Any]] = [
+    {
+        "id": "renewable",
+        "keywords": [
+            "renewable",
+            "clean energy",
+            "solar",
+            "wind",
+            "green energy",
+            "climate",
+            "esg energy",
+        ],
+        "name": "Renewable Power Builders",
+        "stocks": ["ENPH", "FSLR", "NEE", "SEDG", "BE"],
+        "buy": [
+            "Policy or subsidy tailwinds supporting clean-power deployment",
+            "Improving project backlog or installation growth",
+            "Relative strength vs broader utilities / energy peers",
+        ],
+        "sell": [
+            "Rate-sensitive multiple expansion without earnings support",
+            "Negative policy or permitting headlines",
+            "Break of multi-week support after volume spike",
+        ],
+        "summary": "Theme sleeve focused on solar, utilities, and clean-power enablers.",
+    },
+    {
+        "id": "cybersecurity",
+        "keywords": [
+            "cyber",
+            "security",
+            "infosec",
+            "firewall",
+            "zero trust",
+            "ransomware",
+        ],
+        "name": "Cybersecurity Moat",
+        "stocks": ["CRWD", "PANW", "ZS", "S", "FTNT"],
+        "buy": [
+            "Rising threat environment driving budget priority",
+            "Strong net retention / platform attach rates",
+            "Breakout above consolidation with healthy volume",
+        ],
+        "sell": [
+            "Guidance cut or elongated sales cycles",
+            "Multiple compression after growth deceleration",
+            "Breach-related reputational shock without clear remediation",
+        ],
+        "summary": "Defensive-growth sleeve of endpoint, network, and cloud security leaders.",
+    },
+    {
+        "id": "healthcare",
+        "keywords": [
+            "health",
+            "healthcare",
+            "biotech",
+            "pharma",
+            "medical",
+            "hospital",
+            "drug",
+        ],
+        "name": "Healthcare Innovators",
+        "stocks": ["UNH", "LLY", "ISRG", "JNJ", "ABBV"],
+        "buy": [
+            "Pipeline or product catalysts with clear commercial path",
+            "Stable cash flow and defensive demand profile",
+            "Relative outperformance vs healthcare sector ETF",
+        ],
+        "sell": [
+            "Adverse regulatory, pricing, or trial outcome news",
+            "Valuation stretch without earnings confirmation",
+            "Deteriorating volume leadership vs sector peers",
+        ],
+        "summary": "Mix of managed care, therapeutics, and med-tech for healthcare exposure.",
+    },
+    {
+        "id": "robotics",
+        "keywords": [
+            "robot",
+            "robotics",
+            "automation",
+            "industrial ai",
+            "factory",
+            "cobot",
+        ],
+        "name": "Robotics & Automation",
+        "stocks": ["ISRG", "ROK", "TER", "PATH", "IRBT"],
+        "buy": [
+            "Capex cycle turning up for factory / hospital automation",
+            "Order growth or utilization metrics improving",
+            "Momentum confirming a break from base with sector leadership",
+        ],
+        "sell": [
+            "Industrial slowdown or cancelled automation programs",
+            "Margin pressure from input costs or competition",
+            "Failed breakout and return below key moving averages",
+        ],
+        "summary": "Automation and robotics names spanning surgical, industrial, and software layers.",
+    },
+    {
+        "id": "fintech",
+        "keywords": [
+            "fintech",
+            "payments",
+            "digital bank",
+            "neobank",
+            "payments",
+            "crypto exchange",
+            "bnpl",
+        ],
+        "name": "Fintech Rails",
+        "stocks": ["SQ", "PYPL", "COIN", "SOFI", "AFRM"],
+        "buy": [
+            "Payment volume or user growth re-accelerating",
+            "Credit / funding costs stabilizing",
+            "Relative strength vs financials after a constructive base",
+        ],
+        "sell": [
+            "Rising charge-offs or funding stress",
+            "Regulatory actions hitting take-rates or product mix",
+            "Break of rising channel with expanding volatility",
+        ],
+        "summary": "Digital payments, consumer finance, and crypto-adjacent fintech exposure.",
+    },
+    {
+        "id": "ai",
+        "keywords": [
+            "ai",
+            "artificial intelligence",
+            "llm",
+            "gpu",
+            "machine learning",
+            "semiconductor",
+            "chip",
+        ],
+        "name": "AI Infrastructure Momentum",
+        "stocks": ["NVDA", "MSFT", "AMD", "AVGO", "PLTR"],
+        "buy": [
+            "Evidence of AI capex or inference demand continuing",
+            "Earnings growth confirming the AI narrative",
+            "Price momentum with sector leadership",
+        ],
+        "sell": [
+            "Capex digestion or inventory digestion signals",
+            "Competitive share-shift headlines without offsetting growth",
+            "Volatility spike without fundamental confirmation",
+        ],
+        "summary": "AI compute, cloud platforms, and application-layer beneficiaries.",
+    },
+    {
+        "id": "ev",
+        "keywords": ["ev", "electric vehicle", "autonomous", "auto tech", "battery"],
+        "name": "EV & Mobility Tech",
+        "stocks": ["TSLA", "RIVN", "LCID", "QS", "ALB"],
+        "buy": [
+            "Delivery or adoption metrics beating expectations",
+            "Battery cost curve or range improvements",
+            "Constructive price action after a high-volume base",
+        ],
+        "sell": [
+            "Demand miss, price war, or margin shock",
+            "Commodity cost spikes crushing unit economics",
+            "Breakdown below multi-month support",
+        ],
+        "summary": "Electric vehicles and battery-materials exposure for mobility tech.",
+    },
+    {
+        "id": "dividend",
+        "keywords": ["dividend", "income", "yield", "value", "defensive"],
+        "name": "Quality Income Core",
+        "stocks": ["JNJ", "PG", "KO", "PEP", "VZ"],
+        "buy": [
+            "Stable free-cash-flow coverage of the dividend",
+            "Reasonable valuation vs history and peers",
+            "Defensive bid during risk-off tapes",
+        ],
+        "sell": [
+            "Dividend cut risk or payout ratio stress",
+            "Secular demand erosion in the category",
+            "Yield compression after sharp re-rating",
+        ],
+        "summary": "Lower-volatility quality names oriented to income and capital preservation.",
+    },
+    {
+        "id": "cloud",
+        "keywords": ["cloud", "saas", "software", "enterprise software"],
+        "name": "Cloud Software Compounders",
+        "stocks": ["MSFT", "AMZN", "CRM", "NOW", "SNOW"],
+        "buy": [
+            "Cloud consumption or remaining performance obligation growth",
+            "Expanding operating margins with durable retention",
+            "Relative strength vs software peers",
+        ],
+        "sell": [
+            "Optimization cycle lengthening without offsetting AI attach",
+            "Customer concentration or competitive displacement risk",
+            "Failed earnings reaction and loss of momentum",
+        ],
+        "summary": "Hyperscale and enterprise SaaS compounders for cloud exposure.",
+    },
+]
+
+
+def _infer_risk(description: str) -> str:
+    d = description.lower()
+    if any(w in d for w in ("low", "conservative", "defensive", "income", "dividend")):
+        return "Low"
+    if any(w in d for w in ("high", "aggressive", "speculative", "moonshot")):
+        return "High"
+    return "Medium"
+
+
+def _match_theme(description: str) -> dict[str, Any]:
+    """Score theme keywords against the user brief; fall back to a blended growth sleeve."""
+    d = description.lower()
+    best: dict[str, Any] | None = None
+    best_score = 0
+    for theme in STRATEGY_THEMES:
+        score = 0
+        for kw in theme["keywords"]:
+            if kw in d:
+                # Longer phrases count more
+                score += 2 if " " in kw else 1
+        if score > best_score:
+            best_score = score
+            best = theme
+
+    if best and best_score > 0:
+        return best
+
+    # Multi-theme blend from explicit mentions of several verticals
+    matched = [t for t in STRATEGY_THEMES if any(kw in d for kw in t["keywords"])]
+    if len(matched) >= 2:
+        stocks: list[str] = []
+        for t in matched[:3]:
+            for s in t["stocks"][:2]:
+                if s not in stocks:
+                    stocks.append(s)
+        return {
+            "id": "multi",
+            "name": "Multi-Theme Growth Sleeve",
+            "stocks": stocks[:6],
+            "buy": [
+                "Confirm theme catalysts across selected verticals",
+                "Prefer leaders with relative strength in each theme",
+                "Scale in on constructive pullbacks within the uptrend",
+            ],
+            "sell": [
+                "Theme narrative breaks (policy, demand, or funding shock)",
+                "Correlation spike and indiscriminate risk-off selling",
+                "Individual name loses leadership vs its theme peers",
+            ],
+            "summary": "Diversified sleeve mixing the themes detected in the brief.",
+        }
+
+    return {
+        "id": "balanced",
+        "name": "Balanced Growth Basket",
+        "stocks": ["AAPL", "MSFT", "AMZN", "GOOG", "BRK-B"],
+        "buy": [
+            "Broad market trend remains constructive",
+            "Company-level earnings and guidance stay resilient",
+            "Pullbacks hold above rising medium-term averages",
+        ],
+        "sell": [
+            "Market regime shifts to sustained risk-off",
+            "Fundamental deterioration in a core holding",
+            "Position sizing breaches risk limits after volatility expansion",
+        ],
+        "summary": "Diversified mega-cap growth sleeve when no single theme dominates the brief.",
+    }
+
+
 class GeminiService:
     def __init__(self) -> None:
         self.settings = get_settings()
@@ -158,41 +443,61 @@ class GeminiService:
         return json.loads(text)
 
     async def generate_strategy(self, description: str) -> dict[str, Any]:
+        fallback = self._mock_strategy(description)
         if not self.available:
-            return self._mock_strategy(description)
+            return fallback
 
-        prompt = f"""You are AlphaAI, an AI hedge fund research assistant for paper trading only.
-Generate a trading strategy from this user request:
+        theme_hints = ", ".join(
+            t["id"] for t in STRATEGY_THEMES if t["id"] not in {"ai", "ev", "dividend", "cloud"}
+        )
+        prompt = f"""You are AlphaAI, an AI hedge fund research assistant for educational paper trading only.
 
+User brief:
 "{description}"
+
+Generate a DISTINCT strategy matched to the brief. Do NOT default to NVDA/MSFT/AMD/GOOG unless the brief is explicitly about AI/semiconductors.
+
+Supported theme examples (pick what fits; invent a coherent sleeve if needed):
+renewable energy, cybersecurity, healthcare, robotics, fintech, {theme_hints}, cloud, EV, dividends/value, or a multi-theme blend.
+
+Requirements:
+- stocks: 4–6 real, liquid US-listed tickers that fit the theme (use official symbols)
+- buy/sell rules must be theme-specific, not generic boilerplate
+- riskLevel must reflect the brief and theme volatility
+- Never claim certainty. Frame as AI-assisted paper-trading research.
 
 Respond ONLY with valid JSON (no markdown):
 {{
   "name": "short strategy name",
   "riskLevel": "Low" | "Medium" | "High",
-  "stocks": ["TICKER1", "TICKER2", ...],
+  "stocks": ["TICKER1", "TICKER2", "TICKER3", "TICKER4"],
   "rules": {{
-    "buy": ["rule1", "rule2", "rule3"],
-    "sell": ["rule1", "rule2", "rule3"]
+    "buy": ["theme-specific buy rule 1", "rule 2", "rule 3"],
+    "sell": ["theme-specific sell rule 1", "rule 2", "rule 3"]
   }},
-  "summary": "1-2 sentence description"
-}}
-
-Use real stock tickers. Never claim certainty. Frame as AI-assisted analysis."""
+  "summary": "1-2 sentence summary of the strategy thesis"
+}}"""
 
         try:
             text = await self._generate(prompt)
             data = self._extract_json(text)
+            rules = data.get("rules") if isinstance(data.get("rules"), dict) else {}
+            risk = str(data.get("riskLevel") or fallback["riskLevel"]).title()
+            if risk not in {"Low", "Medium", "High"}:
+                risk = fallback["riskLevel"]
             return {
-                "name": data.get("name", "Custom Strategy"),
-                "riskLevel": data.get("riskLevel", "Medium"),
-                "stocks": data.get("stocks", ["NVDA", "MSFT"]),
-                "rules": data.get("rules", {"buy": [], "sell": []}),
-                "summary": data.get("summary", description),
+                "name": str(data.get("name") or fallback["name"]).strip() or fallback["name"],
+                "riskLevel": risk,
+                "stocks": _normalize_tickers(data.get("stocks"), fallback["stocks"]),
+                "rules": {
+                    "buy": _as_str_list(rules.get("buy")) or fallback["rules"]["buy"],
+                    "sell": _as_str_list(rules.get("sell")) or fallback["rules"]["sell"],
+                },
+                "summary": str(data.get("summary") or description).strip() or description,
             }
         except Exception as e:
             print(f"Gemini strategy error: {e}")
-            return self._mock_strategy(description)
+            return fallback
 
     async def analyze_stock(
         self, symbol: str, market_context: dict[str, Any] | None = None
@@ -297,43 +602,38 @@ Never claim certainty. This is AI-assisted analysis only."""
             return self._mock_prediction(market, question)
 
     def _mock_strategy(self, description: str) -> dict[str, Any]:
-        desc_lower = description.lower()
-        if "ai" in desc_lower or "tech" in desc_lower:
-            stocks = ["NVDA", "MSFT", "AMD", "GOOG"]
-            name = "AI Growth Momentum"
-        elif "value" in desc_lower or "dividend" in desc_lower:
-            stocks = ["AAPL", "MSFT", "AMZN"]
-            name = "Quality Value Core"
-        elif "ev" in desc_lower or "auto" in desc_lower:
-            stocks = ["TSLA", "AMD", "NVDA"]
-            name = "EV & Mobility Thesis"
-        else:
-            stocks = ["NVDA", "AAPL", "MSFT", "META"]
-            name = "Balanced Growth Basket"
+        theme = _match_theme(description)
+        risk = _infer_risk(description)
+        # Theme defaults: income → Low, speculative themes → High unless overridden
+        if risk == "Medium":
+            if theme.get("id") in {"dividend"}:
+                risk = "Low"
+            elif theme.get("id") in {"fintech", "ev", "robotics", "ai"}:
+                risk = "High" if any(
+                    w in description.lower() for w in ("high", "aggressive", "speculative")
+                ) else "Medium"
 
-        risk = "Medium"
-        if "low" in desc_lower:
-            risk = "Low"
-        elif "high" in desc_lower or "aggressive" in desc_lower:
-            risk = "High"
+        name = theme["name"]
+        # Reflect risk wording in the name when the user asked for it explicitly
+        d = description.lower()
+        if "low" in d and "Low" not in name:
+            name = f"Conservative {name}"
+        elif "high" in d or "aggressive" in d:
+            name = f"Aggressive {name}"
+
+        summary = theme.get("summary") or description
+        if description.strip():
+            summary = f"{summary} Brief: {description.strip()}"
 
         return {
             "name": name,
             "riskLevel": risk,
-            "stocks": stocks,
+            "stocks": list(theme["stocks"])[:6],
             "rules": {
-                "buy": [
-                    "Strong earnings growth trajectory",
-                    "Positive market sentiment signals",
-                    "Increasing price momentum",
-                ],
-                "sell": [
-                    "Elevated volatility without fundamentals",
-                    "Negative news flow impact",
-                    "Weakening fundamental indicators",
-                ],
+                "buy": list(theme["buy"]),
+                "sell": list(theme["sell"]),
             },
-            "summary": description,
+            "summary": summary,
         }
 
     def _mock_analysis(

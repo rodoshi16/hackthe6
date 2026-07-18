@@ -45,9 +45,27 @@ export function StrategyPage() {
             onChange={(e) => setPrompt(e.target.value)}
             rows={4}
             className="mt-2 w-full resize-y border border-ink/15 bg-paper/60 px-4 py-3 text-ink outline-none focus:border-signal transition-colors"
-            placeholder="e.g. Medium-risk AI growth with clear sell rules"
+            placeholder="e.g. Medium-risk cybersecurity strategy with clear sell rules"
           />
         </label>
+        <div className="flex flex-wrap gap-2 text-sm">
+          {[
+            'Medium-risk renewable energy strategy',
+            'Cybersecurity growth with clear sell rules',
+            'Low-risk healthcare innovators',
+            'Aggressive robotics and automation',
+            'Fintech payments and digital banking',
+          ].map((example) => (
+            <button
+              key={example}
+              type="button"
+              onClick={() => setPrompt(example)}
+              className="text-muted hover:text-signal transition-colors"
+            >
+              {example.split(' ').slice(0, 3).join(' ')}…
+            </button>
+          ))}
+        </div>
         <button
           type="submit"
           disabled={loading || !prompt.trim()}
