@@ -18,9 +18,6 @@ AlphaAI is a simulated AI hedge fund desk: generate strategies, analyze stocks w
 </table>
 
 
-
-
-
 ## Stack
 
 | Layer | Tech |
@@ -137,6 +134,3 @@ Displayed in the UI as **Verified · Solana** with the hash — a tamper-evident
 
 `POST /predict/analyze` reuses the Gemini/strategy engine for prediction markets (`YES`/`NO` + confidence + reasoning/risks). Built for the “Best Predict the 6ix Trading Bot” track.
 
-## License
-
-MIT — hackathon prototype.
