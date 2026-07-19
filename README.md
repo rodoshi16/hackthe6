@@ -43,8 +43,6 @@ cp .env.example ../.env.example  # or edit backend/.env
 uvicorn app.main:app --reload --port 8000
 ```
 
-API docs: http://localhost:8000/docs
-
 ### 2. Frontend
 
 ```bash
@@ -52,8 +50,6 @@ cd frontend
 npm install
 npm run dev
 ```
-
-App: http://localhost:5173
 
 Without Auth0 / Gemini / MongoDB configured, the app runs in **demo mode** with in-memory storage and mock AI — enough for the full hackathon walkthrough.
 
